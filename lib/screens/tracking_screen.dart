@@ -1,19 +1,25 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tracking_location_app/widgets/app_logo.dart';
+import 'package:tracking_location_app/widgets/constant.dart';
 
 class TrackingScreen extends StatefulWidget {
-  final String userName;
-
-  const TrackingScreen({super.key, required this.userName});
+  const TrackingScreen({super.key});
 
   @override
   State<TrackingScreen> createState() => _TrackingScreenState();
 }
 
 class _TrackingScreenState extends State<TrackingScreen> {
+  String? _firstName;
+  String? _groups;
+  String? _email;
   Position? _currentPosition;
   bool _isTracking = false;
   bool _isLoading = false;
@@ -22,6 +28,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   @override
   void initState() {
     super.initState();
+    _loadUserData();
     _checkServiceStatus();
 
     service.on('updateLocation').listen((event) {
@@ -44,6 +51,15 @@ class _TrackingScreenState extends State<TrackingScreen> {
     });
   }
 
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _firstName = prefs.getString('userid');
+      _groups = prefs.getString('groups');
+      _email = prefs.getString('email');
+    });
+  }
+
   void _checkServiceStatus() async {
     bool isRunning = await service.isRunning();
     if (mounted) {
@@ -52,6 +68,75 @@ class _TrackingScreenState extends State<TrackingScreen> {
       });
     }
   }
+
+  // Future<void> _startAlerts() async {
+  //   setState(() => _isLoading = true);
+
+  //   // Check location permission
+  //   final permission = await Permission.location.status;
+  //   if (permission.isDenied) {
+  //     final result = await Permission.location.request();
+  //     if (result.isDenied || result.isPermanentlyDenied) {
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(
+  //             content: Text('Location permission is required'),
+  //             backgroundColor: Colors.orange,
+  //           ),
+  //         );
+  //       }
+  //       setState(() => _isLoading = false);
+  //       return;
+  //     }
+  //   }
+
+  //   // Check location service
+  //   final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  //   if (!serviceEnabled) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //           content: Text('Please enable location service'),
+  //           backgroundColor: Colors.orange,
+  //         ),
+  //       );
+  //     }
+  //     setState(() => _isLoading = false);
+  //     return;
+  //   }
+
+  //   try {
+  //     // Get current location
+  //     final position = await Geolocator.getCurrentPosition(
+  //       locationSettings: const LocationSettings(
+  //         accuracy: LocationAccuracy.high,
+  //       ),
+  //     );
+
+  //     // Send initial alert
+  //     final url = Uri.parse(
+  //       'https://safefamilyalerts.com/alert'
+  //       '?lat=${position.latitude}'
+  //       '&lon=${position.longitude}'
+  //       '&userid=$_firstName'
+  //       '&group=$_groups'
+  //       '&email=$_email',
+  //     );
+
+  //     final response = await http.get(url);
+  //     debugPrint('Initial alert response: ${response.body}');
+  //   } catch (e) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+  //       );
+  //     }
+  //   } finally {
+  //     if (mounted) {
+  //       setState(() => _isLoading = false);
+  //     }
+  //   }
+  // }
 
   Future<void> _startTracking() async {
     setState(() => _isLoading = true);
@@ -90,7 +175,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
 
     await service.startService();
-    service.invoke('startService', {'userName': widget.userName});
+    service.invoke('startService', {
+      'firstName': _firstName,
+      'groups': _groups,
+      'email': _email,
+    });
 
     if (mounted) {
       setState(() {
@@ -125,139 +214,91 @@ class _TrackingScreenState extends State<TrackingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.userName}\'s Location'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding:
-                (_isTracking && _currentPosition != null)
-                    ? const EdgeInsets.all(20)
-                    : EdgeInsets.zero,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (_isTracking && _currentPosition != null) ...[
-                  const SizedBox(height: 8),
-                  const Row(
-                    children: [
-                      Icon(Icons.location_on, color: Colors.red, size: 24),
-                      SizedBox(width: 8),
-                      Text(
-                        'Current location:',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                SvgPicture.string(myAppLogoSvgData, width: 160, height: 160),
+                const SizedBox(height: 16),
+                const Text(
+                  'Safe Family Alerts',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: appColor,
+                  ),
+                ),
+                const SizedBox(height: 60),
+                if (_firstName != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 40),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Welcome, $_firstName',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Group: $_groups',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 60,
+                  child: ElevatedButton(
+                    onPressed:
+                        _isLoading
+                            ? null
+                            : (_isTracking ? _stopTracking : _startTracking),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isTracking ? appRedColor : appColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ],
+                    ),
+                    child:
+                        _isLoading
+                            ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                            : Text(
+                              _isTracking ? 'STOP ALERTS' : 'START ALERTS',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Latitude: ${_currentPosition!.latitude.toStringAsFixed(6)}',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Longitude: ${_currentPosition!.longitude.toStringAsFixed(6)}',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Accuracy: ${_currentPosition!.accuracy.toStringAsFixed(2)}m',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ],
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Stay safe. Alert in seconds.',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
               ],
             ),
           ),
-          Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (!_isTracking) ...[
-                      const Icon(
-                        Icons.location_searching,
-                        size: 80,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Press the button below to start tracking location',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                        textAlign: TextAlign.center,
-                      ),
-                    ] else ...[
-                      const Icon(
-                        Icons.check_circle,
-                        size: 80,
-                        color: Colors.green,
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Currently tracking your location',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.green,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                    const SizedBox(height: 40),
-                    ElevatedButton(
-                      onPressed:
-                          _isLoading
-                              ? null
-                              : (_isTracking ? _stopTracking : _startTracking),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 48,
-                          vertical: 16,
-                        ),
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child:
-                          _isLoading
-                              ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                              : Text(
-                                _isTracking ? 'Stop Tracking' : 'Send Alert',
-                                style: const TextStyle(fontSize: 18),
-                              ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

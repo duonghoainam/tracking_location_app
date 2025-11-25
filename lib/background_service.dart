@@ -50,10 +50,19 @@ void onStart(ServiceInstance service) async {
     service.stopSelf();
   });
 
-  String userName = 'defaultUser';
+  String firstName = 'defaultUser';
+  String groups = 'defaultGroup';
+  String email = 'defaultEmail';
+
   service.on('startService').listen((event) {
-    if (event != null && event['userName'] != null) {
-      userName = event['userName'];
+    if (event != null && event['firstName'] != null) {
+      firstName = event['firstName'];
+    }
+    if (event != null && event['groups'] != null) {
+      groups = event['groups'];
+    }
+    if (event != null && event['email'] != null) {
+      email = event['email'];
     }
   });
 
@@ -72,6 +81,7 @@ void onStart(ServiceInstance service) async {
                 enableWakeLock: true,
               ),
             )
+            //todo: implement ios interval duration 60s
             : AppleSettings(
               accuracy: LocationAccuracy.best,
               distanceFilter: 0,
@@ -92,13 +102,19 @@ void onStart(ServiceInstance service) async {
     });
 
     final url = Uri.parse(
-      'https://grannyflatteam.com/location/alert'
-      '?lat=${position.latitude}&lon=${position.longitude}&userid=$userName',
+      'https://safefamilyalerts.com/alert'
+      '?lat=${position.latitude}'
+      '&lon=${position.longitude}'
+      '&userid=$firstName'
+      '&group=$groups'
+      '&email=$email',
     );
 
     http
         .get(url)
         .then((response) {
+          print('----------');
+          print(response.toString());
           if (response.statusCode == 200) {
             print(
               '✅ Sent location: ${position.latitude}, ${position.longitude} at ${DateTime.now()}',
