@@ -69,81 +69,14 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
   }
 
-  // Future<void> _startAlerts() async {
-  //   setState(() => _isLoading = true);
-
-  //   // Check location permission
-  //   final permission = await Permission.location.status;
-  //   if (permission.isDenied) {
-  //     final result = await Permission.location.request();
-  //     if (result.isDenied || result.isPermanentlyDenied) {
-  //       if (mounted) {
-  //         ScaffoldMessenger.of(context).showSnackBar(
-  //           const SnackBar(
-  //             content: Text('Location permission is required'),
-  //             backgroundColor: Colors.orange,
-  //           ),
-  //         );
-  //       }
-  //       setState(() => _isLoading = false);
-  //       return;
-  //     }
-  //   }
-
-  //   // Check location service
-  //   final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-  //   if (!serviceEnabled) {
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(
-  //           content: Text('Please enable location service'),
-  //           backgroundColor: Colors.orange,
-  //         ),
-  //       );
-  //     }
-  //     setState(() => _isLoading = false);
-  //     return;
-  //   }
-
-  //   try {
-  //     // Get current location
-  //     final position = await Geolocator.getCurrentPosition(
-  //       locationSettings: const LocationSettings(
-  //         accuracy: LocationAccuracy.high,
-  //       ),
-  //     );
-
-  //     // Send initial alert
-  //     final url = Uri.parse(
-  //       'https://safefamilyalerts.com/alert'
-  //       '?lat=${position.latitude}'
-  //       '&lon=${position.longitude}'
-  //       '&userid=$_firstName'
-  //       '&group=$_groups'
-  //       '&email=$_email',
-  //     );
-
-  //     final response = await http.get(url);
-  //     debugPrint('Initial alert response: ${response.body}');
-  //   } catch (e) {
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-  //       );
-  //     }
-  //   } finally {
-  //     if (mounted) {
-  //       setState(() => _isLoading = false);
-  //     }
-  //   }
-  // }
-
   Future<void> _startTracking() async {
     setState(() => _isLoading = true);
 
     final permission = await Permission.location.status;
+
     if (permission.isDenied) {
       final result = await Permission.location.request();
+
       if (result.isDenied || result.isPermanentlyDenied) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -157,6 +90,70 @@ class _TrackingScreenState extends State<TrackingScreen> {
         }
         setState(() => _isLoading = false);
         return;
+      }
+    }
+
+    PermissionStatus status = await Permission.locationWhenInUse.status;
+
+    if (status.isDenied) {
+      status = await Permission.locationWhenInUse.request();
+
+      if (status.isDenied || status.isPermanentlyDenied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Please grant when in use/all the time location permission to use this feature',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          //todo: open openAppSettings(); once user denied permission
+        }
+        setState(() => _isLoading = false);
+        return;
+      }
+    }
+
+    if (status.isGranted) {
+      PermissionStatus alwaysStatus = await Permission.locationAlways.status;
+
+      if (alwaysStatus.isDenied) {
+        bool shouldRequest = await showDialog(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: const Text('Allow all the time location permission?'),
+                content: const Text(
+                  'We need allow all the time location permission to use this feature',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Ok'),
+                  ),
+                ],
+              ),
+        );
+
+        if (shouldRequest == true) {
+          alwaysStatus = await Permission.locationAlways.request();
+        }
+      }
+
+      if (alwaysStatus.isDenied || alwaysStatus.isPermanentlyDenied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Please grant all the time location permission to use this feature',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } else if (alwaysStatus.isGranted) {
+        print("All the time location permission granted!!!!!!!!");
       }
     }
 
