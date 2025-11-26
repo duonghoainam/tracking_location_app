@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tracking_location_app/background_service.dart';
-import 'screens/registration_screen.dart';
+import 'screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,10 +17,10 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Tracking Location App',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF20c997)),
         useMaterial3: true,
       ),
-      home: const RegistrationScreen(),
+      home: const SplashScreen(),
     );
   }
 }

@@ -5,7 +5,7 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = Grandpa Bill
+PRODUCT_NAME = Safe Family Alerts
 
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = com.tisoha.trackingLocationApp
