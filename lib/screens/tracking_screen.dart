@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tracking_location_app/widgets/app_dialog.dart';
 import 'package:tracking_location_app/widgets/app_logo.dart';
 import 'package:tracking_location_app/widgets/constant.dart';
 
@@ -30,6 +31,20 @@ class _TrackingScreenState extends State<TrackingScreen> {
     super.initState();
     _loadUserData();
     _checkServiceStatus();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final granted = await _requestPermissions();
+      if (!granted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Please grant all the time location permissions to use this feature',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    });
 
     service.on('updateLocation').listen((event) {
       if (event != null && mounted) {
@@ -69,35 +84,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
   }
 
-  Future<void> _startTracking() async {
-    setState(() => _isLoading = true);
-
-    final permission = await Permission.location.status;
-
-    if (permission.isDenied) {
-      final result = await Permission.location.request();
-
-      if (result.isDenied || result.isPermanentlyDenied) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Please grant location permission to use this feature',
-              ),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        setState(() => _isLoading = false);
-        return;
-      }
-    }
-
-    PermissionStatus status = await Permission.locationWhenInUse.status;
-
+  Future<bool> _requestPermissions() async {
+    // 1. Request "When In Use"
+    var status = await Permission.locationWhenInUse.status;
     if (status.isDenied) {
       status = await Permission.locationWhenInUse.request();
-
       if (status.isDenied || status.isPermanentlyDenied) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -108,157 +99,82 @@ class _TrackingScreenState extends State<TrackingScreen> {
               backgroundColor: Colors.orange,
             ),
           );
-          //todo: open openAppSettings(); once user denied permission
         }
+        return false;
+      }
+    }
+
+    // 2. Request "Always"
+    var alwaysStatus = await Permission.locationAlways.status;
+    if (alwaysStatus.isDenied) {
+      alwaysStatus = await Permission.locationAlways.request();
+    }
+
+    if (alwaysStatus.isDenied || alwaysStatus.isPermanentlyDenied) {
+      return false;
+    }
+
+    // 3. Check location service
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return false;
+
+    return true;
+  }
+
+  Future<void> _startTracking() async {
+    setState(() => _isLoading = true);
+
+    // STEP 1: When in use
+    PermissionStatus whenInUse = await Permission.locationWhenInUse.status;
+    if (whenInUse.isDenied || whenInUse.isPermanentlyDenied) {
+      whenInUse = await Permission.locationWhenInUse.request();
+
+      if (!whenInUse.isGranted) {
+        await openAppSettings();
         setState(() => _isLoading = false);
         return;
       }
     }
 
-    if (status.isGranted) {
-      PermissionStatus alwaysStatus = await Permission.locationAlways.status;
+    // STEP 2: Always allow
+    PermissionStatus always = await Permission.locationAlways.status;
 
-      if (alwaysStatus.isDenied) {
-        bool shouldRequest = await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder:
-              (context) => AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                title: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: appColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.location_on,
-                        color: appColor,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Location Permission',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'To keep you and your family safe, we need "Always Allow" location permission.',
-                      style: TextStyle(
-                        fontSize: 16,
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: appColor.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: appColor.withOpacity(0.2),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildPermissionBenefit(
-                            Icons.notifications_active,
-                            'Send alerts even when app is closed',
-                          ),
-                          const SizedBox(height: 8),
-                          _buildPermissionBenefit(
-                            Icons.family_restroom,
-                            'Keep your family informed 24/7',
-                          ),
-                          const SizedBox(height: 8),
-                          _buildPermissionBenefit(
-                            Icons.security,
-                            'Continuous safety monitoring',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text(
-                      'Not Now',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: appColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Allow',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-        );
+    if (!always.isGranted) {
+      bool shouldRequest = await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => buildRequestLocationDialog(context),
+      );
 
-        if (shouldRequest == true) {
-          alwaysStatus = await Permission.locationAlways.request();
-        }
+      if (shouldRequest != true) {
+        setState(() => _isLoading = false);
+        return;
       }
 
-      if (alwaysStatus.isDenied || alwaysStatus.isPermanentlyDenied) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Please grant all the time location permission to use this feature',
-              ),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      } else if (alwaysStatus.isGranted) {
-        print("All the time location permission granted!!!!!!!!");
-      }
+      always = await Permission.locationAlways.request();
     }
 
+    if (!always.isGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please allow "Always" location in Settings.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      await openAppSettings();
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    // STEP 3: Location service
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please turn on location service on your device'),
+            content: Text('Please turn on location service'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -267,6 +183,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
       return;
     }
 
+    // STEP 4: Start background service
     await service.startService();
     service.invoke('startService', {
       'firstName': _firstName,
@@ -302,28 +219,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
         ),
       );
     }
-  }
-
-  Widget _buildPermissionBenefit(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 20,
-          color: appColor,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-            ),
-          ),
-        ),
-      ],
-    );
   }
 
   @override
