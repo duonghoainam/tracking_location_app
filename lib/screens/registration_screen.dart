@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tracking_location_app/screens/tracking_screen.dart';
 import 'package:tracking_location_app/widgets/app_logo.dart';
 import 'package:tracking_location_app/widgets/constant.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -59,7 +60,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       setState(() {
         _isTracking = isRunning;
       });
-      if (isRunning) {
+      if (isRunning ||
+          (_firstNameController.text != '' &&
+              _groupNameController.text != '' &&
+              _emailController.text != '')) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const TrackingScreen()),
@@ -263,6 +267,52 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         const Text(
                           'Stay safe. Alert in seconds.',
                           style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () async {
+                                  final Uri url = Uri.parse(
+                                    'https://safefamilyalerts.com/privacy',
+                                  );
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(url);
+                                  }
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: appColor,
+                                  side: const BorderSide(color: appColor),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text('Privacy'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () async {
+                                  final Uri url = Uri.parse(
+                                    'https://safefamilyalerts.com/tos',
+                                  );
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(url);
+                                  }
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: appColor,
+                                  side: const BorderSide(color: appColor),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text('TOS'),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
