@@ -221,6 +221,50 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
   }
 
+  void _stopTrackingWithApi() async {
+    final url = Uri.parse(
+      'https://safefamilyalerts.com/alert'
+      '?lat=${_currentPosition!.latitude}'
+      '&lon=${_currentPosition!.longitude}'
+      '&userid=$_firstName'
+      '&group=$_groups'
+      '&email=$_email'
+      '&safe=y',
+    );
+    print('-----=========-----');
+    print(url);
+
+    http
+        .get(url)
+        .then((response) {
+          print('-----yyyyyyyy-----');
+          print(response.toString());
+          if (response.statusCode == 200) {
+            print('✅ Sent location: success at ${DateTime.now()}');
+          } else {
+            print('⚠️ Failed to send location: ${response.statusCode}');
+          }
+        })
+        .catchError((e, stackTrace) {
+          print('❌ Error sending location: $e');
+          print(stackTrace);
+        });
+
+    service.invoke('stopService');
+    if (mounted) {
+      setState(() {
+        _isTracking = false;
+        _currentPosition = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Stopped tracking location'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -266,6 +310,39 @@ class _TrackingScreenState extends State<TrackingScreen> {
                       ],
                     ),
                   ),
+                if (_isTracking)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 60,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _stopTrackingWithApi,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: appRedColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child:
+                          _isLoading
+                              ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                              : Text(
+                                'It\'s Okay I\'m Safe - Stop Alerts',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   height: 60,
